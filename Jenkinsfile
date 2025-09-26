@@ -8,7 +8,7 @@ pipeline {
                     echo "Building using Maven..."
                     
                     // compiles code and packages into a .jar
-                    bat 'mvn clean package' // 'clean' removes previous builds
+                    bat 'mvnw.cmd clean package' // 'clean' removes previous builds
                     
                     // name image with build number
                     def imageName = "petclinic-app:${env.BUILD_ID}"
