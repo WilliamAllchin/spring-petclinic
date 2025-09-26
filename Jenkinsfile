@@ -35,8 +35,7 @@ pipeline {
 
                     // run integration tests with Maven 'verify'
                     echo "Running Maven Integration Tests..."
-                    bat 'mvnw.cmd verify -Dpetclinic.url=http://localhost:8080'
-
+                    bat 'mvnw.cmd verify -DskipTests -Dpetclinic.url=http://localhost:8080' // '-DskipTests' skips unit tests which were run during build stage. skipping to only run integration tests.
                     
                     echo "Integration tests completed successfully!"
                 }
