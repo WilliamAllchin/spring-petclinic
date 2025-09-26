@@ -50,7 +50,7 @@ pipeline {
                 }
                 success {
                     // saves test results
-                    junit 'target/failsafe-reports/*.xml'
+                    junit 'spring-petclinic-web/target/failsafe-reports/*.xml'
                 }
             }
         }
