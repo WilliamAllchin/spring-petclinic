@@ -57,7 +57,14 @@ pipeline {
         
         stage("Code Quality") {
             steps {
-                echo "Running code quality analysis with SonarQube..."
+                script {
+                    echo "Running code quality analysis with SonarQube..."
+
+                    withSonarQubeEnv('SonarQubeServer') {
+                        // SonarQube analysis with Maven
+                        bat 'mvnw.cmd sonar:sonar -Dsonar.projectKey=spring-petclinic'
+                    }
+                }
             }
         }
         
