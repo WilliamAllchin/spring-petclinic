@@ -72,6 +72,8 @@ pipeline {
             steps {
                 script {
                     echo "Performing automated security analysis with Trivy on Docker image..."
+
+                    bat 'echo %PATH%' // check what path Jenkins is using
                     
                     // runs Trivy on docker image, exits if any vulnerabilities found
                     bat "trivy image --exit-code 1 --format table %IMAGE_NAME%"
