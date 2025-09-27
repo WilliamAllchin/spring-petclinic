@@ -45,7 +45,7 @@ pipeline {
             post {
                 always {
                     // save results
-                    junit testResultsPattern: 'target/surefire-reports/TEST-*.xml'
+                    junit 'target/surefire-reports/TEST-*.xml'
                 }
             }
         }
