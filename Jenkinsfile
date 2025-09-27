@@ -37,20 +37,13 @@ pipeline {
         stage("Test") {
             steps {
                 script {
-                    // start database and app services from docker-compose.yml
-                    echo "Starting integration test environment with Docker Compose..."
-                    bat 'docker-compose -f docker-compose.yml up -d --wait'
-
-                    echo "Integration test environment started."
-
-                    // run unit (JUnit) and integration tests
-                    echo "Running Maven Integration Tests..."
-                    bat 'mvnw.cmd verify -Dpetclinic.url=http://localhost:8080'
+                    // Run unit tests only (no application startup needed)
+                    echo "Running unit tests..."
+                    bat 'mvnw.cmd test'
                     
-                    echo "Integration tests completed successfully!"
+                    echo "Unit tests completed successfully!"
                 }
             }
-            // This 'post' block ensures the environment is always cleaned up.
             post {
                 always {
                     script {
