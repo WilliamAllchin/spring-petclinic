@@ -21,6 +21,8 @@ pipeline {
                     
                     // name image with build number
                     env.IMAGE_NAME = "petclinic-app:${env.BUILD_ID}"
+                    // debug line
+                    echo "DEBUG: Value of env.IMAGE_NAME before docker.build: '${env.IMAGE_NAME}'" 
                     def customImage = docker.build(env.IMAGE_NAME)
                     
                     echo "Successfully built Docker image ${env.IMAGE_NAME}."
