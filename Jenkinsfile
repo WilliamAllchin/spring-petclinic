@@ -18,7 +18,7 @@ pipeline {
                     echo "Building using Maven..."
                     
                     // compiles code and packages into a .jar
-                    bat 'mvnw.cmd clean package' // 'clean' removes previous builds
+                    bat 'mvnw.cmd clean package -DskipTests' // '-DskipTests' skips unit tests which were will be run during Test stage
                     
                     // name image with build number
                     def imageName = "petclinic-app:${env.BUILD_ID}"
@@ -43,9 +43,9 @@ pipeline {
 
                     echo "Integration test environment started."
 
-                    // run integration tests with Maven 'verify'
+                    // run unit (JUnit) and integration tests
                     echo "Running Maven Integration Tests..."
-                    bat 'mvnw.cmd verify -DskipTests -Dpetclinic.url=http://localhost:8080' // '-DskipTests' skips unit tests which were run during build stage. skipping to only run integration tests.
+                    bat 'mvnw.cmd verify -Dpetclinic.url=http://localhost:8080'
                     
                     echo "Integration tests completed successfully!"
                 }
