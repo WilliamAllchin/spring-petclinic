@@ -5,6 +5,11 @@ pipeline {
         maven 'Maven3' 
         jdk 'JDK17' // using Java 17
     }
+
+    environment {
+        AWS_REGION = 'ap-southeast-2'
+        REPO_NAME = 'sit753/task73hd'
+    }
     
     stages {
         stage("Build") {
@@ -102,7 +107,31 @@ pipeline {
         
         stage("Release") {
             steps {
-                echo "Promoting application to a production environment..."
+                script {
+                    echo "Promoting application to a production environment..."
+                    
+                    withAWS(region: "${env.AWS_REGION}", credentials: 'aws-creds'){
+
+                        // get ECR login and login to Docker
+                        bat """
+                            aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin 262740797964.dkr.ecr.ap-southeast-2.amazonaws.com
+                        """
+
+                        // tag image with ECR repo url
+                        def ecrImageName = "262740797964.dkr.ecr.ap-southeast-2.amazonaws.com/${env.REPO_NAME}:${env.BUILD_ID}"
+                        bat "docker tag ${env.IMAGE_NAME} ${ecrImageName}"
+
+                        // tag as latest
+                        def ecrImageLatest = "262740797964.dkr.ecr.ap-southeast-2.amazonaws.com/${env.REPO_NAME}:latest"
+                        bat "docker tag ${env.IMAGE_NAME} ${ecrImageLatest}"
+
+                        // push tags to ECR
+                        bat "docker push ${ecrImageName}"
+                        bat "docker push ${ecrImageLatest}"
+
+                        echo "Successfully pushed image to ECR."
+                    }
+                }
             }
         }
         
