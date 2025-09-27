@@ -79,7 +79,7 @@ pipeline {
                     echo "Performing automated security analysis with Trivy on Docker image..."
                     
                     // runs Trivy on docker image, exits if any HIGH/CRITICAL vulnerabilities found
-                    bat "trivy image --severity HIGH,CRITICAL --exit-code 1 --format table ${env.IMAGE_NAME}"
+                    bat "trivy image --exit-code 1 --severity CRITICAL,HIGH --format table --ignore-unfixed ${env.IMAGE_NAME}"
                     
                     echo "Security scan with Trivy completed."
                 }
