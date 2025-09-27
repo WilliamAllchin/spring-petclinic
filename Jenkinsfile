@@ -5,6 +5,10 @@ pipeline {
         maven 'Maven3' 
         jdk 'JDK17' // using Java 17
     }
+
+    environment {
+        IMAGE_NAME = "" // initialised empty. takes value in Build stage based on build number
+    }
     
     stages {
         stage("Build") {
@@ -16,8 +20,8 @@ pipeline {
                     bat 'mvnw.cmd clean package' // 'clean' removes previous builds
                     
                     // name image with build number
-                    def imageName = "petclinic-app:${env.BUILD_ID}"
-                    def customImage = docker.build(imageName)
+                    env.IMAGE_NAME = "petclinic-app:${env.BUILD_ID}"
+                    def customImage = docker.build(env.IMAGE_NAME)
                     
                     echo "Successfully built Docker image ${imageName}."
                 }
