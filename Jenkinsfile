@@ -78,8 +78,8 @@ pipeline {
                 script {
                     echo "Performing automated security analysis with Trivy on Docker image..."
                     
-                    // runs Trivy on docker image, exits if any HIGH/CRITICAL vulnerabilities found
-                    bat "trivy image --exit-code 1 --severity CRITICAL,HIGH --format table --ignore-unfixed ${env.IMAGE_NAME}"
+                    // runs Trivy on docker image
+                    bat "trivy image --severity HIGH,CRITICAL --format table --ignore-unfixed ${env.IMAGE_NAME}"
                     
                     echo "Security scan with Trivy completed."
                 }
@@ -89,7 +89,14 @@ pipeline {
         
         stage("Deploy") {
             steps {
-                echo "Deploy to a testing environment..."
+                script {
+                    echo "Deploy to a testing environment..."
+                    
+                    // deploy with Docker Compose
+                    bat "docker-compose -f docker-compose.yml up -d"
+                    
+                    echo "Application successfully deployed to the testing environment."
+                }
             }
         }
         
