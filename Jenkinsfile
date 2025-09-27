@@ -37,23 +37,15 @@ pipeline {
         stage("Test") {
             steps {
                 script {
-                    // Run unit tests only (no application startup needed)
-                    echo "Running unit tests..."
-                    bat 'mvnw.cmd test'
+                    echo "Running JUnit tests using Maven..."
                     
-                    echo "Unit tests completed successfully!"
+                    bat 'mvnw.cmd test -Dspring.profiles.active=test -Dmaven.test.failure.ignore=false'
                 }
             }
             post {
                 always {
-                    script {
-                        // stops and removes resources created by docker-compose up
-                        bat 'docker-compose -f docker-compose.yml down'
-                    }
-                }
-                success {
-                    // saves test results
-                    junit 'target/surefire-reports/*.xml'
+                    // save results
+                    junit testResultsPattern: 'target/surefire-reports/TEST-*.xml'
                 }
             }
         }
