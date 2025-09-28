@@ -122,10 +122,28 @@ pipeline {
         
         stage("Monitoring") {
             steps {
-                echo "Monitoring application in production..."
+                script {
+                    echo "Monitoring application in production..."
+
+                    withAWS(region: "${env.AWS_REGION}", credentials: 'aws-creds') {
+                
+                        echo "Checking ECR exists..."
+                        bat """
+                            aws ecr describe-images ^
+                                --repository-name ${env.REPO_NAME} ^
+                                --image-ids imageTag=latest ^
+                                --region ${env.AWS_REGION}
+                        """
+                        
+                        echo "Setting up CloudWatch monitoring..."
+                        bat """
+                            aws cloudwatch put-metric-data ^
+                                --namespace "SpringPetClinic" ^
+                                --metric-data MetricName=ProductionDeployment,Value=1,Unit=Count
+                        """
+                }
             }
         }
-        
     }
     
 }
