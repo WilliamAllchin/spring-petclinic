@@ -154,6 +154,29 @@ pipeline {
                                 --namespace "SpringPetClinic" ^
                                 --metric-data MetricName=ProductionDeployment,Value=1,Unit=Count
                         """
+
+                        echo "Listing metrics being collected..."
+                        bat '''
+                            aws cloudwatch list-metrics ^
+                                --namespace "SpringPetClinic/Application" ^
+                                --output table
+                        '''
+
+                        echo "Creating high memory alert..."
+                        bat '''
+                            aws cloudwatch put-metric-alarm ^
+                                --alarm-name "SpringPetClinic-HighMemory-%BUILD_NUMBER%" ^
+                                --alarm-description "Alerts when memory usage is high" ^
+                                --metric-name "MemoryUtilization" ^
+                                --namespace "AWS/ECR" ^
+                                --statistic Average ^
+                                --period 300 ^
+                                --threshold 80 ^
+                                --comparison-operator GreaterThanThreshold ^
+                                --evaluation-periods 1
+                        '''
+
+                        echo "Monitoring with CloudWatch set up successfully!"
                     }
                 }
             }
