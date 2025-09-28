@@ -172,6 +172,17 @@ pipeline {
                             bat """
                                 powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{title='ECR Deployment: ${env.REPO_NAME}'; text='Deployed build ${env.BUILD_NUMBER} to ECR'; tags=@('repository:${env.REPO_NAME}','build:${env.BUILD_NUMBER}'); alert_type='success'} | ConvertTo-Json; Invoke-RestMethod -Uri 'https://api.datadoghq.com/api/v1/events' -Method Post -Headers \$headers -Body \$body"
                             """
+
+                            // verify metrics were accepted
+                            bat """
+                                powershell -Command "
+                                    \$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}
+                                    \$body = @{series=@(@{metric='ecr.image.size'; points=@(@(${currentTime}, ${imageSizeMB})); type='gauge'; tags=@('repository:${env.REPO_NAME}','build:${env.BUILD_NUMBER}')})} | ConvertTo-Json -Depth 4
+                                    \$response = Invoke-RestMethod -Uri 'https://api.datadoghq.com/api/v1/series' -Method Post -Headers \$headers -Body \$body
+                                    Write-Host 'Datadog Response:' \$response
+                                    Write-Host 'Metric sent: ecr.image.size = ${imageSizeMB} MB'
+                                "
+                            """
         
                             echo "Datadog metrics sent successfully!"
                         }
