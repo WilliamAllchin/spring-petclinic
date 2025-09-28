@@ -152,13 +152,16 @@ pipeline {
                         bat """
                             aws cloudwatch put-metric-data ^
                                 --namespace "SpringPetClinic" ^
-                                --metric-data MetricName=ProductionDeployment,Value=1,Unit=Count
+                                --metric-name "ProductionDeployment" ^
+                                --value 1 ^
+                                --unit Count ^
+                                --dimensions Environment=Production,BuildNumber=%BUILD_NUMBER%
                         """
 
                         echo "Listing metrics being collected..."
                         bat '''
                             aws cloudwatch list-metrics ^
-                                --namespace "SpringPetClinic/Application" ^
+                                --namespace "SpringPetClinic" ^
                                 --output table
                         '''
 
@@ -168,7 +171,7 @@ pipeline {
                                 --alarm-name "SpringPetClinic-HighMemory-%BUILD_NUMBER%" ^
                                 --alarm-description "Alerts when memory usage is high" ^
                                 --metric-name "MemoryUtilization" ^
-                                --namespace "AWS/ECR" ^
+                                --namespace "SpringPetClinic" ^
                                 --statistic Average ^
                                 --period 300 ^
                                 --threshold 80 ^
