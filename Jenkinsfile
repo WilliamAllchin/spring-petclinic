@@ -142,7 +142,7 @@ pipeline {
                         withAWS(region: "${env.AWS_REGION}", credentials: 'aws-creds') {
                             
                             // get image size in bytes from AWS
-                            def imageSize = bat(
+                            def imageSizeBytes = bat(
                                 script: """
                                     aws ecr describe-images ^
                                         --repository-name ${env.REPO_NAME} ^
@@ -152,21 +152,19 @@ pipeline {
                                 """,
                                 returnStdout: true
                             ).trim()
+
+                            def imageSizeMB = (imageSizeBytes as Long) / 1048576 // converts bytes to MB
+                            def currentTime = System.currentTimeMillis() / 1000
                                                         
                             // send metrics to Datadog
+                            echo "Sending metrics to Datadog..."
                             bat """
-                                curl -X POST "https://api.datadoghq.com/api/v1/series" ^
-                                -H "Content-Type: application/json" ^
-                                -H "DD-API-KEY: ${DD_API_KEY}" ^
-                                -d "{\\"series\\":[{\\"metric\\":\\"ecr.image.size\\",\\"points\\":[[%date:~10,4%-%date:~4,2%-%date:~7,2%, ${imageSize}]],\\"type\\":\\"gauge\\",\\"tags\\":[\\"repository:${env.REPO_NAME}\\",\\"build:${env.BUILD_NUMBER}\\"]}]}"
+                                powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{series=@(@{metric='ecr.image.size'; points=@(@(${currentTime}, ${imageSizeMB})); type='gauge'; tags=@('repository:${env.REPO_NAME}','build:${env.BUILD_NUMBER}')})} | ConvertTo-Json -Depth 4; Invoke-RestMethod -Uri 'https://api.datadoghq.com/api/v1/series' -Method Post -Headers \$headers -Body \$body"
                             """
                             
-                            // send deployment event (only needs API key)
+                            // send deployment event
                             bat """
-                                curl -X POST "https://api.datadoghq.com/api/v1/events" ^
-                                -H "Content-Type: application/json" ^
-                                -H "DD-API-KEY: ${DD_API_KEY}" ^
-                                -d "{\\"title\\":\\"ECR Deployment: ${env.REPO_NAME}\\",\\"text\\":\\"Deployed build ${env.BUILD_NUMBER} to ECR\\",\\"tags\\":[\\"repository:${env.REPO_NAME}\\",\\"build:${env.BUILD_NUMBER}\\"],\\"alert_type\\":\\"success\\"}"
+                                powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{title='ECR Deployment: ${env.REPO_NAME}'; text='Deployed build ${env.BUILD_NUMBER} to ECR'; tags=@('repository:${env.REPO_NAME}','build:${env.BUILD_NUMBER}'); alert_type='success'} | ConvertTo-Json; Invoke-RestMethod -Uri 'https://api.datadoghq.com/api/v1/events' -Method Post -Headers \$headers -Body \$body"
                             """
                             
                             echo "Datadog metrics sent successfully!"
