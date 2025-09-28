@@ -159,18 +159,18 @@ pipeline {
                             
                             def imageSizeMB = (imageSizeBytes as Long) / 1048576 // converts bytes to MB
                             def currentTime = System.currentTimeMillis() / 1000
-        
-                            // send metrics to Datadog
+                            
                             echo "Sending metrics to Datadog..."
                             echo "Image size: ${imageSizeMB} MB"
-                            
+
+                            // send metrics to Datadog
                             bat """
-                                powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{series=@(@{metric='ecr.image.size'; points=@(@(${currentTime}, ${imageSizeMB})); type='gauge'; tags=@('repository:${env.REPO_NAME}','build:${env.BUILD_NUMBER}')})} | ConvertTo-Json -Depth 4; Invoke-RestMethod -Uri 'https://api.datadoghq.com/api/v1/series' -Method Post -Headers \$headers -Body \$body"
+                                powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{series=@(@{metric='ecr.image.size'; points=@(@(${currentTime}, ${imageSizeMB})); type='gauge'; tags=@('repository:${env.REPO_NAME}','build:${env.BUILD_NUMBER}')})} | ConvertTo-Json -Depth 4; Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/series' -Method Post -Headers \$headers -Body \$body"
                             """
         
                             // send deployment event
                             bat """
-                                powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{title='ECR Deployment: ${env.REPO_NAME}'; text='Deployed build ${env.BUILD_NUMBER} to ECR'; tags=@('repository:${env.REPO_NAME}','build:${env.BUILD_NUMBER}'); alert_type='success'} | ConvertTo-Json; Invoke-RestMethod -Uri 'https://api.datadoghq.com/api/v1/events' -Method Post -Headers \$headers -Body \$body"
+                                powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{title='ECR Deployment: ${env.REPO_NAME}'; text='Deployed build ${env.BUILD_NUMBER} to ECR'; tags=@('repository:${env.REPO_NAME}','build:${env.BUILD_NUMBER}'); alert_type='success'} | ConvertTo-Json; Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/events' -Method Post -Headers \$headers -Body \$body"
                             """
 
                             // verify metrics were accepted
