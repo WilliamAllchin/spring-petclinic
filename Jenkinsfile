@@ -38,13 +38,15 @@ pipeline {
             steps {
                 script {
                     echo "Running tests..."
-                    bat 'mvnw.cmd test -Dspring.profiles.active=postgres'
-                    echo "Tests completed successfully!"
+                    
+                    bat 'mvnw.cmd test -Dspring.docker.compose.skip=true -Dtestcontainers.reuse.enable=false -Dspring.profiles.active=test'
+                    
+                    echo "Unit tests completed successfully!"
                 }
             }
             post {
                 always {
-                    junit 'target/surefire-reports/TEST-*.xml' // save test results
+                    junit 'target/surefire-reports/TEST-*.xml'
                 }
             }
         }
