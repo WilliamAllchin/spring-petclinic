@@ -141,9 +141,10 @@ pipeline {
                                 --namespace "SpringPetClinic" ^
                                 --metric-data MetricName=ProductionDeployment,Value=1,Unit=Count
                         """
+                    }
                 }
             }
         }
+        
     }
-    
 }
