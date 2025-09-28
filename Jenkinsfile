@@ -37,15 +37,14 @@ pipeline {
         stage("Test") {
             steps {
                 script {
-                    // start database for integration tests
-                    echo "Starting database for integration tests..."
-                    bat 'docker-compose -f docker-compose.yml up -d db'
+                    echo "Starting database services for integration tests..."
+                    bat 'docker-compose -f docker-compose.yml up -d'
                     
-                    // wait for database to be ready
-                    sleep(time: 15, unit: 'SECONDS')
+                    // wait for services to be ready
+                    sleep(time: 30, unit: 'SECONDS')
                     
-                    echo "Running unit and integration tests..."
-                    bat 'mvnw.cmd test -Dspring.profiles.active=test'
+                    echo "Running JUnit and integration tests..."
+                    bat 'mvnw.cmd test -Dspring.profiles.active=postgres'
                 }
             }
             post {
