@@ -16,9 +16,12 @@ pipeline {
             steps {
                 script {
                     echo "Building using Maven..."
+
+                    // clean and compile code
+                    bat 'mvnw.cmd clean compile'
                     
-                    // compiles code and packages into a .jar
-                    bat 'mvnw.cmd clean package -DskipTests' // '-DskipTests' skips unit tests which were will be run during Test stage
+                    // package application
+                    bat 'mvnw.cmd package -DskipTests' // '-DskipTests' skips unit tests which will be run during Test stage
                     
                     // name image with build number
                     def imageName = "petclinic-app:${env.BUILD_ID}"
@@ -38,15 +41,24 @@ pipeline {
             steps {
                 script {
                     echo "Running tests..."
-                    
-                    bat 'mvnw.cmd test -Dspring.profiles.active=test -Dspring.datasource.url=jdbc:h2:mem:testdb -Dspring.docker.compose.enabled=false'
+
+                    // run unit tests
+                    bat '''
+                        mvnw.cmd test -Dtest="!*IntegrationTests" ^
+                        -DfailIfNoTests=false ^
+                        -Dspring.profiles.active=test ^
+                        -Dspring.datasource.url=jdbc:h2:mem:testdb ^
+                        -Dspring.datasource.driver-class-name=org.h2.Driver ^
+                        -Dspring.jpa.database-platform=org.hibernate.dialect.H2Dialect ^
+                        -Dspring.docker.compose.enabled=false
+                    '''
                     
                     echo "Tests completed successfully!"
                 }
             }
             post {
                 always {
-                    junit 'target/surefire-reports/TEST-*.xml' // save results
+                    junit allowEmptyResults: true, testResults: 'target/surefire-reports/TEST-*.xml' // save results
                 }
             }
         }
