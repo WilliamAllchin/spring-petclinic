@@ -136,50 +136,41 @@ pipeline {
         stage("Monitoring") {
             steps {
                 script {
-                    echo "Monitoring application in production..."
+                    echo "Setting up production application monitoring..."
 
-                    withAWS(region: "${env.AWS_REGION}", credentials: 'aws-creds') {
-                
-                        echo "Checking ECR exists..."
-                        bat """
-                            aws ecr describe-images ^
-                                --repository-name ${env.REPO_NAME} ^
-                                --image-ids imageTag=latest ^
-                                --region ${env.AWS_REGION}
-                        """
-                        
-                        echo "Setting up CloudWatch monitoring..."
-                        bat """
-                            aws cloudwatch put-metric-data ^
-                                --namespace "SpringPetClinic" ^
-                                --metric-name "ProductionDeployment" ^
-                                --value 1 ^
-                                --unit Count ^
-                                --dimensions Environment=Production,BuildNumber=%BUILD_NUMBER%
-                        """
-
-                        echo "Listing metrics being collected..."
-                        bat '''
-                            aws cloudwatch list-metrics ^
-                                --namespace "SpringPetClinic" ^
-                                --output table
-                        '''
-
-                        echo "Creating high memory alert..."
-                        bat '''
-                            aws cloudwatch put-metric-alarm ^
-                                --alarm-name "SpringPetClinic-HighMemory-%BUILD_NUMBER%" ^
-                                --alarm-description "Alerts when memory usage is high" ^
-                                --metric-name "MemoryUtilization" ^
-                                --namespace "SpringPetClinic" ^
-                                --statistic Average ^
-                                --period 300 ^
-                                --threshold 80 ^
-                                --comparison-operator GreaterThanThreshold ^
-                                --evaluation-periods 1
-                        '''
-
-                        echo "Monitoring with CloudWatch set up successfully!"
+                    withCredentials([string(credentialsId: 'datadog-api-key', variable: 'DD_API_KEY')]) {
+                        withAWS(region: "${env.AWS_REGION}", credentials: 'aws-creds') {
+                            
+                            // get image size in bytes from AWS
+                            def imageSize = bat(
+                                script: """
+                                    aws ecr describe-images ^
+                                        --repository-name ${env.REPO_NAME} ^
+                                        --image-ids imageTag=${env.BUILD_ID} ^
+                                        --query "imageDetails[0].imageSizeInBytes" ^
+                                        --output text
+                                """,
+                                returnStdout: true
+                            ).trim()
+                                                        
+                            // send metrics to Datadog
+                            bat """
+                                curl -X POST "https://api.datadoghq.com/api/v1/series" ^
+                                -H "Content-Type: application/json" ^
+                                -H "DD-API-KEY: ${DD_API_KEY}" ^
+                                -d "{\\"series\\":[{\\"metric\\":\\"ecr.image.size\\",\\"points\\":[[%date:~10,4%-%date:~4,2%-%date:~7,2%, ${imageSize}]],\\"type\\":\\"gauge\\",\\"tags\\":[\\"repository:${env.REPO_NAME}\\",\\"build:${env.BUILD_NUMBER}\\"]}]}"
+                            """
+                            
+                            // send deployment event (only needs API key)
+                            bat """
+                                curl -X POST "https://api.datadoghq.com/api/v1/events" ^
+                                -H "Content-Type: application/json" ^
+                                -H "DD-API-KEY: ${DD_API_KEY}" ^
+                                -d "{\\"title\\":\\"ECR Deployment: ${env.REPO_NAME}\\",\\"text\\":\\"Deployed build ${env.BUILD_NUMBER} to ECR\\",\\"tags\\":[\\"repository:${env.REPO_NAME}\\",\\"build:${env.BUILD_NUMBER}\\"],\\"alert_type\\":\\"success\\"}"
+                            """
+                            
+                            echo "Datadog metrics sent successfully!"
+                        }
                     }
                 }
             }
