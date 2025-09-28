@@ -37,15 +37,22 @@ pipeline {
         stage("Test") {
             steps {
                 script {
-                    echo "Running JUnit tests using Maven..."
+                    // start database for integration tests
+                    echo "Starting database for integration tests..."
+                    bat 'docker-compose -f docker-compose.yml up -d db'
                     
-                    bat 'mvnw.cmd test -Dspring.profiles.active=test -Dmaven.test.failure.ignore=false'
+                    // wait for database to be ready
+                    sleep(time: 15, unit: 'SECONDS')
+                    
+                    echo "Running unit and integration tests..."
+                    bat 'mvnw.cmd test -Dspring.profiles.active=test'
                 }
             }
             post {
                 always {
-                    // save results
-                    junit 'target/surefire-reports/TEST-*.xml'
+                    // stop database services
+                    bat 'docker-compose -f docker-compose.yml down'
+                    junit 'target/surefire-reports/TEST-*.xml' // save results
                 }
             }
         }
