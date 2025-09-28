@@ -39,7 +39,7 @@ pipeline {
                 script {
                     echo "Running tests..."
                     
-                    bat 'mvnw.cmd test -Dspring.profiles.active=test -Dspring.datasource.url=jdbc:h2:mem:testdb -Dspring.docker.compose.skip=true'
+                    bat 'mvnw.cmd test -Dspring.profiles.active=test -Dspring.datasource.url=jdbc:h2:mem:testdb -Dspring.docker.compose.enabled=false'
                     
                     echo "Tests completed successfully!"
                 }
