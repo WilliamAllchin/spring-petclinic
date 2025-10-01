@@ -114,26 +114,23 @@ pipeline {
                     // save image as .tar for promotion to EC2 instance
                     bat "docker save ${env.IMAGE_NAME} -o petclinic-image.tar"
 
-                    // deploy to EC2 with SSH
-                    withCredentials([sshUserPrivateKey(credentialsId: 'ec2-deploy-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
-                        // copy SSH key to workspace
+                    withCredentials([sshUserPrivateKey(credentialsId: 'ec2-deploy-key', keyFileVariable: 'SSH_KEY')]) {
+                        // using powershell to hopefully resolve ssh key permissions error
                         bat """
-                            copy "%SSH_KEY%" ssh-key.pem
-                            icacls ssh-key.pem /inheritance:r
-                            icacls ssh-key.pem /grant:r "%USERNAME%:(R)"
-                            icacls ssh-key.pem /remove "BUILTIN\\Users"
+                            powershell -Command "
+                                Copy-Item '%SSH_KEY%' 'ssh-key.pem'
+                                \$acl = Get-Acl 'ssh-key.pem'
+                                \$acl.SetAccessRuleProtection(\$true, \$false)
+                                \$accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule('%USERNAME%', 'Read', 'Allow')
+                                \$acl.SetAccessRule(\$accessRule)
+                                Set-Acl 'ssh-key.pem' \$acl
+                                
+                                scp -i ssh-key.pem -o StrictHostKeyChecking=no petclinic-image.tar ec2-user@3.25.139.255:/home/ec2-user/
+                                ssh -i ssh-key.pem -o StrictHostKeyChecking=no ec2-user@3.25.139.255 'sudo docker load -i petclinic-image.tar && sudo docker stop petclinic || true && sudo docker rm petclinic || true && sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME}'
+                                
+                                Remove-Item 'ssh-key.pem' -Force
+                            "
                         """
-                        
-                        bat """
-                            scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no petclinic-image.tar %SSH_USER%@3.25.139.255:/home/ec2-user/
-                        """
-
-                        // deploy on EC2
-                        bat """
-                            ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@3.25.139.255 "sudo docker load -i petclinic-image.tar && sudo docker stop petclinic || true && sudo docker rm petclinic || true && sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME}"
-                        """
-                        // delete local copy of key
-                        bat "del ssh-key.pem"
                     }
 
                     // deletes .tar after promoting it to production
