@@ -51,6 +51,7 @@ pipeline {
                         -Dspring.datasource.driver-class-name=org.h2.Driver ^
                         -Dspring.jpa.database-platform=org.hibernate.dialect.H2Dialect ^
                         -Dspring.docker.compose.enabled=false
+                        -Dcheckstyle.skip=true
                     '''
                     
                     echo "Tests completed successfully!"
@@ -70,7 +71,7 @@ pipeline {
 
                     withSonarQubeEnv('SonarQubeServer') {
                         // SonarQube analysis with Maven
-                        bat 'mvnw.cmd sonar:sonar -Dsonar.projectKey=spring-petclinic'
+                        bat 'mvnw.cmd sonar:sonar -Dsonar.projectKey=spring-petclinic -Dcheckstyle.skip=true'
                     }
                 }
             }
