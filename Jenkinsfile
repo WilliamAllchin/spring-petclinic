@@ -114,14 +114,16 @@ pipeline {
                     // save image as .tar for promotion to EC2 instance
                     bat "docker save ${env.IMAGE_NAME} -o petclinic-image.tar"
 
-                    sshagent(['ec2-deploy-key']) {
-                        // Transfer and deploy to EC2
-                        bat "scp -o StrictHostKeyChecking=no petclinic-image.tar ec2-user@3.25.139.255:/home/ec2-user/"
-                    
-                        bat """
-                            ssh -o StrictHostKeyChecking=no ec2-user@3.25.139.255 "sudo docker load -i petclinic-image.tar && sudo docker stop petclinic || true && sudo docker rm petclinic || true && sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME}"
-                        """
-                    }
+                    // deploy to EC2 with SSH
+                    withCredentials([sshUserPrivateKey(credentialsId: 'ec2-deploy-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
+                                    bat """
+                                        scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no petclinic-image.tar %SSH_USER%@3.25.139.255:/home/ec2-user/
+                                    """
+                                    
+                                    bat """
+                                        ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@3.25.139.255 "sudo docker load -i petclinic-image.tar && sudo docker stop petclinic || true && sudo docker rm petclinic || true && sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME}"
+                                    """
+                                }
 
                     // deletes .tar after promoting it to production
                     bat "del petclinic-image.tar"
