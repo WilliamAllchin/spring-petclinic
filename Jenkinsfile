@@ -110,28 +110,23 @@ pipeline {
             steps {
                 script {
                     echo "Promoting application to a production environment..."
+
+                    // save image as .tar for promotion to EC2 instance
+                    bat "docker save ${env.IMAGE_NAME} -o petclinic-image.tar"
+
+                    sshagent(['ec2-deploy-key']) {
+                        // Transfer and deploy to EC2
+                        bat "scp -o StrictHostKeyChecking=no petclinic-image.tar ec2-user@3.25.139.255:/home/ec2-user/"
                     
-                    withAWS(region: "${env.AWS_REGION}", credentials: 'aws-creds'){
-
-                        // get ECR login and login to Docker
                         bat """
-                            aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin 262740797964.dkr.ecr.ap-southeast-2.amazonaws.com
+                            ssh -o StrictHostKeyChecking=no ec2-user@3.25.139.255 "sudo docker load -i petclinic-image.tar && sudo docker stop petclinic || true && sudo docker rm petclinic || true && sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME}"
                         """
-
-                        // tag image with ECR repo url
-                        def ecrImageName = "262740797964.dkr.ecr.ap-southeast-2.amazonaws.com/${env.REPO_NAME}:${env.BUILD_ID}"
-                        bat "docker tag ${env.IMAGE_NAME} ${ecrImageName}"
-
-                        // tag as latest
-                        def ecrImageLatest = "262740797964.dkr.ecr.ap-southeast-2.amazonaws.com/${env.REPO_NAME}:latest"
-                        bat "docker tag ${env.IMAGE_NAME} ${ecrImageLatest}"
-
-                        // push tags to ECR
-                        bat "docker push ${ecrImageName}"
-                        bat "docker push ${ecrImageLatest}"
-
-                        echo "Successfully pushed image to ECR."
                     }
+
+                    // deletes .tar after promoting it to production
+                    bat "del petclinic-image.tar"
+
+                    echo "Production deployment accessible at: http://3.25.139.255:8080"
                 }
             }
         }
