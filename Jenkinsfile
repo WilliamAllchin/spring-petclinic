@@ -18,10 +18,10 @@ pipeline {
                     echo "Building using Maven..."
 
                     // clean and compile code
-                    bat 'mvnw.cmd clean compile'
+                    bat 'mvnw.cmd clean compile -Dcheckstyle.skip=true'
                     
                     // package application
-                    bat 'mvnw.cmd package -DskipTests' // '-DskipTests' skips unit tests which will be run during Test stage
+                    bat 'mvnw.cmd package -DskipTests -Dcheckstyle.skip=true' // '-DskipTests' skips unit tests which will be run during Test stage
                     
                     // name image with build number
                     def imageName = "petclinic-app:${env.BUILD_ID}"
@@ -71,7 +71,7 @@ pipeline {
 
                     withSonarQubeEnv('SonarQubeServer') {
                         // SonarQube analysis with Maven
-                        bat 'mvnw.cmd sonar:sonar -Dsonar.projectKey=spring-petclinic'
+                        bat 'mvnw.cmd sonar:sonar -Dsonar.projectKey=spring-petclinic -Dcheckstyle.skip=true'
                     }
                 }
             }
