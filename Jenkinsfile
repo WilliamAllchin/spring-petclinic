@@ -101,7 +101,7 @@ pipeline {
                     // start all services
                     bat "docker-compose up -d"
                     
-                    echo "Application successfully deployed to the testing environment locally ( http://localhost:8090 )."
+                    echo "Application successfully deployed to the testing environment locally at port 8090."
                 }
             }
         }
@@ -126,7 +126,7 @@ pipeline {
                     // deletes .tar after promoting it to production
                     bat "del petclinic-image.tar"
 
-                    echo "Production deployment accessible at: http://3.25.139.255:8080"
+                    echo "Production deployment accessible at EC2 instance 3.25.139.255 on port 8080"
                 }
             }
         }
