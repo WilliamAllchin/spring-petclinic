@@ -116,14 +116,25 @@ pipeline {
 
                     // deploy to EC2 with SSH
                     withCredentials([sshUserPrivateKey(credentialsId: 'ec2-deploy-key', keyFileVariable: 'SSH_KEY', usernameVariable: 'SSH_USER')]) {
-                                    bat """
-                                        scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no petclinic-image.tar %SSH_USER%@3.25.139.255:/home/ec2-user/
-                                    """
-                                    
-                                    bat """
-                                        ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@3.25.139.255 "sudo docker load -i petclinic-image.tar && sudo docker stop petclinic || true && sudo docker rm petclinic || true && sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME}"
-                                    """
-                                }
+                        // copy SSH key to workspace
+                        bat """
+                            copy "%SSH_KEY%" ssh-key.pem
+                            icacls ssh-key.pem /inheritance:r
+                            icacls ssh-key.pem /grant:r "%USERNAME%:(R)"
+                            icacls ssh-key.pem /remove "BUILTIN\\Users"
+                        """
+                        
+                        bat """
+                            scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no petclinic-image.tar %SSH_USER%@3.25.139.255:/home/ec2-user/
+                        """
+
+                        // deploy on EC2
+                        bat """
+                            ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %SSH_USER%@3.25.139.255 "sudo docker load -i petclinic-image.tar && sudo docker stop petclinic || true && sudo docker rm petclinic || true && sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME}"
+                        """
+                        // delete local copy of key
+                        bat "del ssh-key.pem"
+                    }
 
                     // deletes .tar after promoting it to production
                     bat "del petclinic-image.tar"
