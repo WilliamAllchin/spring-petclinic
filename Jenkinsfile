@@ -94,11 +94,14 @@ pipeline {
             steps {
                 script {
                     echo "Deploy to a testing environment..."
+
+                    // stop existing containers
+                    bat "docker-compose down || true"
                     
-                    // deploy with Docker Compose
-                    bat "docker-compose -f docker-compose.yml up -d"
+                    // start all services
+                    bat "docker-compose up -d"
                     
-                    echo "Application successfully deployed to the testing environment."
+                    echo "Application successfully deployed to the testing environment locally ( http://localhost:8090 )."
                 }
             }
         }
