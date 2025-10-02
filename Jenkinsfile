@@ -121,84 +121,29 @@ pipeline {
                                 configName: 'ec2-production',
                                 transfers: [
                                     sshTransfer(
-                                        sourceFiles: '',
-                                        removePrefix: '',
-                                        remoteDirectory: '',
-                                        execCommand: """
-                                            echo "=== System Check ==="
-                                            whoami
-                                            pwd
-                                            which docker || echo "Docker not found"
-                                            sudo docker --version || echo "Docker not accessible"
-                                            ls -la /home/ec2-user/ || echo "Cannot list home directory"
-                                        """
-                                    )
-                                ]
-                            )
-                        ]
-                    )
-        
-                    // transfer the file first, then execute commands separately
-                    sshPublisher(
-                        publishers: [
-                            sshPublisherDesc(
-                                configName: 'ec2-production',
-                                transfers: [
-                                    sshTransfer(
                                         sourceFiles: 'petclinic-image.tar',
-                                        removePrefix: '',
-                                        remoteDirectory: '',
-                                        execCommand: ''  // No command during transfer
-                                    )
-                                ]
-                            )
-                        ]
-                    )
-        
-                    // execute deployment commands
-                    sshPublisher(
-                        publishers: [
-                            sshPublisherDesc(
-                                configName: 'ec2-production',
-                                transfers: [
-                                    sshTransfer(
-                                        sourceFiles: '',
-                                        removePrefix: '',
-                                        remoteDirectory: '',
                                         execCommand: """
-                                            echo "=== Starting Deployment ==="
-                                            ls -la petclinic-image.tar
+                                            echo "Deploying ${env.IMAGE_NAME}..."
                                             
-                                            echo "=== Installing Docker if needed ==="
-                                            if ! command -v docker &> /dev/null; then
-                                                sudo yum update -y
-                                                sudo yum install docker -y
-                                                sudo service docker start
-                                                sudo usermod -a -G docker ec2-user
-                                            fi
-                                            
-                                            echo "=== Loading Docker Image ==="
+                                            # load new image
                                             sudo docker load -i petclinic-image.tar
                                             
-                                            echo "=== Stopping Existing Container ==="
+                                            # replace running container
                                             sudo docker stop petclinic || echo "No container to stop"
                                             sudo docker rm petclinic || echo "No container to remove"
-                                            
-                                            echo "=== Starting New Container ==="
                                             sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME}
                                             
-                                            echo "=== Cleanup ==="
+                                            # cleanup and verify
                                             rm -f petclinic-image.tar
+                                            sudo docker ps | grep petclinic
                                             
-                                            echo "=== Deployment Complete ==="
-                                            sudo docker ps | grep petclinic || echo "Container not running"
+                                            echo "Deployment complete!"
                                         """
                                     )
                                 ]
                             )
                         ]
                     )
-
 
                     // deletes .tar after promoting it to production
                     bat "del petclinic-image.tar"
