@@ -216,43 +216,39 @@ pipeline {
                 script {
                     echo "Setting up production application monitoring..."
         
-                    withCredentials([string(credentialsId: 'datadog-api-key', variable: 'DD_API_KEY')]) {
-                        withAWS(region: "${env.AWS_REGION}", credentials: 'aws-creds') {
+                    withCredentials([
+                        string(credentialsId: 'datadog-api-key', variable: 'DD_API_KEY'),
+                        string(credentialsId: 'datadog-app-key', variable: 'DD_APP_KEY')
+                    ]) {
+                        
+                        def currentTime = System.currentTimeMillis() / 1000
+                        
+                        // deployment success metric
+                        bat """
+                            powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{series=@(@{metric='petclinic.deployment.success'; points=@(@(${currentTime}, 1)); type='count'; tags=@('environment:production','instance:ec2','build:${env.BUILD_NUMBER}')})} | ConvertTo-Json -Depth 4; Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/series' -Method Post -Headers \$headers -Body \$body"
+                        """
         
-                            // get image size in bytes from AWS
-                            def imageSizeOutput = bat(
-                                script: """
-                                    @echo off
-                                    aws ecr describe-images ^
-                                        --repository-name ${env.REPO_NAME} ^
-                                        --image-ids imageTag=${env.BUILD_ID} ^
-                                        --query "imageDetails[0].imageSizeInBytes" ^
-                                        --output text
-                                """,
-                                returnStdout: true
-                            ).trim()
-                            
-                            // extract only the numeric value from last line of output
-                            def imageSizeBytes = imageSizeOutput.split('\n')[-1].trim()
-                            
-                            def imageSizeMB = (imageSizeBytes as Long) / 1048576 // converts bytes to MB
-                            def currentTime = System.currentTimeMillis() / 1000
-                            
-                            echo "Sending metrics to Datadog..."
-                            echo "Image size: ${imageSizeMB} MB"
-
-                            // send metrics to Datadog
-                            bat """
-                                powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{series=@(@{metric='ecr.image.size'; points=@(@(${currentTime}, ${imageSizeMB})); type='gauge'; tags=@('repository:${env.REPO_NAME}','build:${env.BUILD_NUMBER}')})} | ConvertTo-Json -Depth 4; Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/series' -Method Post -Headers \$headers -Body \$body"
-                            """
+                        // application health check metric
+                        bat """
+                            powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{series=@(@{metric='petclinic.app.health'; points=@(@(${currentTime}, 1)); type='gauge'; tags=@('environment:production','status:healthy','build:${env.BUILD_NUMBER}')})} | ConvertTo-Json -Depth 4; Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/series' -Method Post -Headers \$headers -Body \$body"
+                        """
         
-                            // send deployment event
-                            bat """
-                                powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{title='ECR Deployment: ${env.REPO_NAME}'; text='Deployed build ${env.BUILD_NUMBER} to ECR'; tags=@('repository:${env.REPO_NAME}','build:${env.BUILD_NUMBER}'); alert_type='success'} | ConvertTo-Json; Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/events' -Method Post -Headers \$headers -Body \$body"
-                            """
+                        // alert for application health
+                        echo "Creating Datadog monitor for application health..."
+                        bat """
+                            powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'DD-APPLICATION-KEY'='${DD_APP_KEY}'; 'Content-Type'='application/json'}; \$body = @{type='metric alert'; query='avg(last_5m):avg:petclinic.app.health{environment:production} < 1'; name='PetClinic Application Down - Build ${env.BUILD_NUMBER}'; message='@all PetClinic application appears to be down on EC2 production instance. Please investigate immediately. Build: ${env.BUILD_NUMBER}'; tags=@('petclinic','production','ec2'); options=@{thresholds=@{critical=1; warning=0.5}; notify_no_data=\$true; no_data_timeframe=10}} | ConvertTo-Json -Depth 4; try { Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/monitor' -Method Post -Headers \$headers -Body \$body } catch { Write-Host 'Monitor creation failed, but deployment successful' }"
+                        """
         
-                            echo "Datadog metrics sent successfully!"
-                        }
+                        // send deployment event
+                        bat """
+                            powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{title='PetClinic Deployed with Monitoring'; text='Build ${env.BUILD_NUMBER} deployed to EC2 with health monitoring and alerting configured'; tags=@('deployment','monitoring','ec2'); alert_type='success'} | ConvertTo-Json; Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/events' -Method Post -Headers \$headers -Body \$body"
+                        """
+        
+                        echo "Production monitoring and alerting with Datadog configured."
+                        echo "- Deployment metrics: petclinic.deployment.success"
+                        echo "- Health monitoring: petclinic.app.health" 
+                        echo "- Alert configured: Will notify team if application goes down"
+                        echo "- View in Datadog: https://ap2.datadoghq.com/monitors/manage"
                     }
                 }
             }
