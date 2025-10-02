@@ -6,11 +6,6 @@ pipeline {
         jdk 'JDK17' // using Java 17
     }
 
-    environment {
-        AWS_REGION = 'ap-southeast-2'
-        REPO_NAME = 'sit753/task73hd'
-    }
-    
     stages {
         stage("Build") {
             steps {
@@ -141,7 +136,7 @@ pipeline {
                         ]
                     )
         
-                    // Transfer the file first, then execute commands separately
+                    // transfer the file first, then execute commands separately
                     sshPublisher(
                         publishers: [
                             sshPublisherDesc(
@@ -158,7 +153,7 @@ pipeline {
                         ]
                     )
         
-                    // Now execute deployment commands
+                    // execute deployment commands
                     sshPublisher(
                         publishers: [
                             sshPublisherDesc(
@@ -214,41 +209,38 @@ pipeline {
         stage("Monitoring") {
             steps {
                 script {
-                    echo "Setting up production application monitoring..."
+                    echo "Installing Datadog Agent on EC2..."
         
-                    withCredentials([
-                        string(credentialsId: 'datadog-api-key', variable: 'DD_API_KEY'),
-                        string(credentialsId: 'datadog-app-key', variable: 'DD_APP_KEY')
-                    ]) {
+                    withCredentials([string(credentialsId: 'datadog-api-key', variable: 'DD_API_KEY')]) {
                         
-                        def currentTime = System.currentTimeMillis() / 1000
-                        
-                        // deployment success metric
-                        bat """
-                            powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{series=@(@{metric='petclinic.deployment.success'; points=@(@(${currentTime}, 1)); type='count'; tags=@('environment:production','instance:ec2','build:${env.BUILD_NUMBER}')})} | ConvertTo-Json -Depth 4; Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/series' -Method Post -Headers \$headers -Body \$body"
-                        """
+                        // install Datadog agent on EC2
+                        sshPublisher(
+                            publishers: [
+                                sshPublisherDesc(
+                                    configName: 'ec2-production',
+                                    transfers: [
+                                        sshTransfer(
+                                            sourceFiles: '',
+                                            execCommand: """
+                                                # Install Datadog Agent
+                                                DD_API_KEY=${DD_API_KEY} bash -c "\$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script.sh)"
+                                                
+                                                # Configure Docker monitoring
+                                                sudo docker run -d --name datadog-agent \\
+                                                    -v /var/run/docker.sock:/var/run/docker.sock:ro \\
+                                                    -v /proc/:/host/proc/:ro \\
+                                                    -v /sys/fs/cgroup/:/host/sys/fs/cgroup:ro \\
+                                                    -e DD_API_KEY=${DD_API_KEY} \\
+                                                    -e DD_SITE="ap2.datadoghq.com" \\
+                                                    datadog/agent:latest
+                                            """
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
         
-                        // application health check metric
-                        bat """
-                            powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{series=@(@{metric='petclinic.app.health'; points=@(@(${currentTime}, 1)); type='gauge'; tags=@('environment:production','status:healthy','build:${env.BUILD_NUMBER}')})} | ConvertTo-Json -Depth 4; Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/series' -Method Post -Headers \$headers -Body \$body"
-                        """
-        
-                        // alert for application health
-                        echo "Creating Datadog monitor for application health..."
-                        bat """
-                            powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'DD-APPLICATION-KEY'='${DD_APP_KEY}'; 'Content-Type'='application/json'}; \$body = @{type='metric alert'; query='avg(last_5m):avg:petclinic.app.health{environment:production} < 1'; name='PetClinic Application Down - Build ${env.BUILD_NUMBER}'; message='@all PetClinic application appears to be down on EC2 production instance. Please investigate immediately. Build: ${env.BUILD_NUMBER}'; tags=@('petclinic','production','ec2'); options=@{thresholds=@{critical=1; warning=0.5}; notify_no_data=\$true; no_data_timeframe=10}} | ConvertTo-Json -Depth 4; try { Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/monitor' -Method Post -Headers \$headers -Body \$body } catch { Write-Host 'Monitor creation failed, but deployment successful' }"
-                        """
-        
-                        // send deployment event
-                        bat """
-                            powershell -Command "\$headers = @{'DD-API-KEY'='${DD_API_KEY}'; 'Content-Type'='application/json'}; \$body = @{title='PetClinic Deployed with Monitoring'; text='Build ${env.BUILD_NUMBER} deployed to EC2 with health monitoring and alerting configured'; tags=@('deployment','monitoring','ec2'); alert_type='success'} | ConvertTo-Json; Invoke-RestMethod -Uri 'https://api.ap2.datadoghq.com/api/v1/events' -Method Post -Headers \$headers -Body \$body"
-                        """
-        
-                        echo "Production monitoring and alerting with Datadog configured."
-                        echo "- Deployment metrics: petclinic.deployment.success"
-                        echo "- Health monitoring: petclinic.app.health" 
-                        echo "- Alert configured: Will notify team if application goes down"
-                        echo "- View in Datadog: https://ap2.datadoghq.com/monitors/manage"
+                        echo "Datadog agent installed successfully."
                     }
                 }
             }
