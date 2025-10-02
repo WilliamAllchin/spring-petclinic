@@ -97,10 +97,12 @@ pipeline {
                     // stop existing containers
                     bat "docker-compose down || true"
                     
-                    // start all services
-                    bat "docker-compose up -d"
+                    // start all services by passing BUILD_ID to docker-compose
+                    withEnv(["BUILD_ID=${env.BUILD_ID}"]) {
+                        bat "docker-compose up -d"
+                    }
                     
-                    echo "Application successfully deployed to the testing environment locally at port 8090."
+                    echo "Application deploying to the testing environment locally at port 8090."
                 }
             }
         }
