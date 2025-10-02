@@ -118,24 +118,25 @@ pipeline {
                     withCredentials([sshUserPrivateKey(credentialsId: 'ec2-deploy-key', keyFileVariable: 'SSH_KEY')]) {
                         // using powershell to hopefully resolve ssh key permissions error
                         try {
-                            bat """
-                                powershell -Command "
-                                    Copy-Item '%SSH_KEY%' 'ssh-key.pem'
-                                    \$acl = Get-Acl 'ssh-key.pem'
-                                    \$acl.SetAccessRuleProtection(\$true, \$false)
-                                    \$accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule('%USERNAME%', 'Read', 'Allow')
-                                    \$acl.SetAccessRule(\$accessRule)
-                                    Set-Acl 'ssh-key.pem' \$acl
-                                    
-                                    scp -i ssh-key.pem -o StrictHostKeyChecking=no petclinic-image.tar ec2-user@3.25.139.255:/home/ec2-user/
-                                    ssh -i ssh-key.pem -o StrictHostKeyChecking=no ec2-user@3.25.139.255 'sudo docker load -i petclinic-image.tar && sudo docker stop petclinic || true && sudo docker rm petclinic || true && sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME}'
-                                    
-                                    Remove-Item 'ssh-key.pem' -Force
-                                "
+                            powershell """
+                                Copy-Item '${env.SSH_KEY}' 'ssh-key.pem'
+                                \$acl = Get-Acl 'ssh-key.pem'
+                                \$acl.SetAccessRuleProtection(\$true, \$false)
+                                \$accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule('${env.USERNAME}', 'Read', 'Allow')
+                                \$acl.SetAccessRule(\$accessRule)
+                                Set-Acl 'ssh-key.pem' \$acl
+                                
+                                # Transfer file
+                                scp -i ssh-key.pem -o StrictHostKeyChecking=no petclinic-image.tar ec2-user@3.25.139.255:/home/ec2-user/
+                                
+                                # Deploy on EC2
+                                ssh -i ssh-key.pem -o StrictHostKeyChecking=no ec2-user@3.25.139.255 "sudo docker load -i petclinic-image.tar && sudo docker stop petclinic 2>/dev/null || true && sudo docker rm petclinic 2>/dev/null || true && sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME}"
+                                
+                                Remove-Item 'ssh-key.pem' -Force
                             """
                         } finally {
                             // ensure cleanup
-                            bat "powershell -Command \"Remove-Item 'ssh-key.pem' -Force -ErrorAction SilentlyContinue\""
+                            powershell "Remove-Item 'ssh-key.pem' -Force -ErrorAction SilentlyContinue"
                         }
                     }
 
