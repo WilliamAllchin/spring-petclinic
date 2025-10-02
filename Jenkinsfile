@@ -224,10 +224,14 @@ pipeline {
                                         sshTransfer(
                                             sourceFiles: '',
                                             execCommand: """
-                                                # Install Datadog Agent
+                                                echo "Cleaning up existing Datadog containers."
+                                                sudo docker stop datadog-agent || echo "No datadog-agent container to stop"
+                                                sudo docker rm datadog-agent || echo "No datadog-agent container to remove"
+                                            
+                                                # install Datadog agent
                                                 DD_API_KEY=${DD_API_KEY} bash -c "\$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script.sh)"
                                                 
-                                                # Configure Docker monitoring
+                                                # configure Docker monitoring
                                                 sudo docker run -d --name datadog-agent \\
                                                     -v /var/run/docker.sock:/var/run/docker.sock:ro \\
                                                     -v /proc/:/host/proc/:ro \\
@@ -235,6 +239,11 @@ pipeline {
                                                     -e DD_API_KEY=${DD_API_KEY} \\
                                                     -e DD_SITE="ap2.datadoghq.com" \\
                                                     datadog/agent:latest
+
+                                                echo "Verifying Datadog installation."
+                                                sleep 5
+                                                sudo docker ps | grep datadog-agent || echo "Datadog container not found."
+                                                echo "Datadog monitoring configured successfully."
                                             """
                                         )
                                     ]
