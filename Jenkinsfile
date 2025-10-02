@@ -18,10 +18,10 @@ pipeline {
                     echo "Building using Maven..."
 
                     // clean and compile code
-                    bat 'mvnw.cmd clean compile -Dcheckstyle.skip=true'
+                    bat 'mvnw.cmd clean compile'
                     
                     // package application
-                    bat 'mvnw.cmd package -DskipTests -Dcheckstyle.skip=true' // '-DskipTests' skips unit tests which will be run during Test stage
+                    bat 'mvnw.cmd package -DskipTests' // '-DskipTests' skips unit tests which will be run during Test stage
                     
                     // name image with build number
                     def imageName = "petclinic-app:${env.BUILD_ID}"
@@ -50,8 +50,7 @@ pipeline {
                         -Dspring.datasource.url=jdbc:h2:mem:testdb ^
                         -Dspring.datasource.driver-class-name=org.h2.Driver ^
                         -Dspring.jpa.database-platform=org.hibernate.dialect.H2Dialect ^
-                        -Dspring.docker.compose.enabled=false ^
-                        -Dcheckstyle.skip=true
+                        -Dspring.docker.compose.enabled=false
                     '''
                     
                     echo "Tests completed successfully!"
@@ -71,7 +70,7 @@ pipeline {
 
                     withSonarQubeEnv('SonarQubeServer') {
                         // SonarQube analysis with Maven
-                        bat 'mvnw.cmd sonar:sonar -Dsonar.projectKey=spring-petclinic -Dcheckstyle.skip=true'
+                        bat 'mvnw.cmd sonar:sonar -Dsonar.projectKey=spring-petclinic'
                     }
                 }
             }
@@ -115,30 +114,27 @@ pipeline {
                     // save image as .tar for promotion to EC2 instance
                     bat "docker save ${env.IMAGE_NAME} -o petclinic-image.tar"
 
-                    withCredentials([sshUserPrivateKey(credentialsId: 'ec2-deploy-key', keyFileVariable: 'SSH_KEY')]) {
-                        // using powershell to hopefully resolve ssh key permissions error
-                        try {
-                            powershell """
-                                Copy-Item '${env.SSH_KEY}' 'ssh-key.pem'
-                                \$acl = Get-Acl 'ssh-key.pem'
-                                \$acl.SetAccessRuleProtection(\$true, \$false)
-                                \$accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule('${env.USERNAME}', 'Read', 'Allow')
-                                \$acl.SetAccessRule(\$accessRule)
-                                Set-Acl 'ssh-key.pem' \$acl
-                                
-                                # Transfer file
-                                scp -i ssh-key.pem -o StrictHostKeyChecking=no petclinic-image.tar ec2-user@3.25.139.255:/home/ec2-user/
-                                
-                                # Deploy on EC2
-                                ssh -i ssh-key.pem -o StrictHostKeyChecking=no ec2-user@3.25.139.255 "sudo docker load -i petclinic-image.tar && sudo docker stop petclinic 2>/dev/null || true && sudo docker rm petclinic 2>/dev/null || true && sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME}"
-                                
-                                Remove-Item 'ssh-key.pem' -Force
-                            """
-                        } finally {
-                            // ensure cleanup
-                            powershell "Remove-Item 'ssh-key.pem' -Force -ErrorAction SilentlyContinue"
-                        }
-                    }
+                    sshPublisher(
+                        publishers: [
+                            sshPublisherDesc(
+                                configName: 'ec2-production',
+                                transfers: [
+                                    sshTransfer(
+                                        sourceFiles: 'petclinic-image.tar',
+                                        removePrefix: '',
+                                        remoteDirectory: '',
+                                        execCommand: """
+                                            sudo docker load -i petclinic-image.tar &&
+                                            sudo docker stop petclinic 2>/dev/null || true &&
+                                            sudo docker rm petclinic 2>/dev/null || true &&
+                                            sudo docker run -d --name petclinic -p 8080:8080 ${env.IMAGE_NAME} &&
+                                            rm petclinic-image.tar
+                                        """
+                                    )
+                                ]
+                            )
+                        ]
+                    )
 
                     // deletes .tar after promoting it to production
                     bat "del petclinic-image.tar"
