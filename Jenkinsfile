@@ -17,6 +17,10 @@ pipeline {
                 script {
                     echo "Building using Maven..."
 
+                    //  delete leftover files from previous builds to prevent checkstyle errors from Maven
+                    bat "del ssh-key.pem 2>nul || echo No ssh-key.pem to delete"
+                    bat "del petclinic-image.tar 2>nul || echo No tar file to delete"
+
                     // clean and compile code
                     bat 'mvnw.cmd clean compile'
                     
